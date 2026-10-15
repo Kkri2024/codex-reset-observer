@@ -1,0 +1,13 @@
+import { useState } from 'react';
+import { ArrowDown,ChevronDown } from 'lucide-react';
+import { formatTime,monthOf,type Event,type Kind,type Zone } from './data';
+export const kindNames:Record<Kind,string>={global:'公共重置',banked:'赠送次数',signal:'待确认'};
+export function History({events,zone,available}:{events:Event[];zone:Zone;available:boolean}){
+  const [kind,setKind]=useState<Kind|'all'>('all'),[month,setMonth]=useState('all'),[limit,setLimit]=useState(15);
+  const months=[...new Set(events.map(e=>monthOf(e,zone)))].sort().reverse();
+  const filtered=events.filter(e=>(kind==='all'||e.kind===kind)&&(month==='all'||monthOf(e,zone)===month));
+  return <section id="history" aria-labelledby="history-title"><div className="section-head"><h2 id="history-title">重置历史</h2><span className="meta">{events.filter(e=>e.kind!=='signal').length} 条收录记录</span></div><div className="history-toolbar"><div className="tabs" role="group" aria-label="事件类型">{(['all','global','banked','signal'] as const).map(k=><button key={k} aria-pressed={kind===k} onClick={()=>{setKind(k);setLimit(15);}}>{k==='all'?'全部':kindNames[k]}</button>)}</div><label>月份 <select value={month} onChange={e=>{setMonth(e.target.value);setLimit(15);}}><option value="all">所有月份</option>{months.map(m=><option key={m}>{m}</option>)}</select></label></div>{!available&&<p className="notice">主历史接口暂无本次成功响应，记录可能来自缓存或其他来源。</p>}<HistoryRows events={filtered.slice(0,limit)} zone={zone}/>{filtered.length>limit&&<button className="secondary load-more" onClick={()=>setLimit(n=>n+15)}>再显示 15 条<ArrowDown size={14}/></button>}<p className="footnote">第三方收录，本站未独立核验；未收录不代表未发生。</p></section>;
+}
+export function HistoryRows({events,zone}:{events:Event[];zone:Zone}){
+  return <div className="history-list">{events.length?events.map((e,i)=><article className="history-row" key={`${e.id}:${e.at}:${i}`}><div className="history-date"><time dateTime={e.at}>{formatTime(e.at,zone,e.dayOnly)}</time><span>{e.dayOnly?'仅日期':e.timeBasis==='observation'?'观察时间':'来源记录时间'}</span></div><div className="history-content"><div className="history-title"><span className={`tag ${e.kind}`}>{kindNames[e.kind]}</span><h3>{e.title}</h3></div><p>{e.scope}{e.conflict&&<strong className="warning"> · 来源有差异</strong>}</p><details><summary>记录详情<ChevronDown size={14}/></summary><p className="quote">{e.evidence||'来源未附摘录'}</p><p>收录来源：{e.origins.join('、')}；本站未独立核验。</p></details></div><div className="history-link">{e.url?<a href={e.url} target="_blank" rel="noopener noreferrer">原始公告 ↗</a>:<span>链接未提供</span>}</div></article>):<p className="empty">暂无匹配记录。请调整筛选，或稍后刷新数据。</p>}</div>;
+}

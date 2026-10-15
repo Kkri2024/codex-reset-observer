@@ -5,7 +5,11 @@ export interface Event {
   scope: string; status: string; evidence: string; url: string;
   origins: string[]; conflict?: boolean; timeBasis?: string;
 }
-export interface Forecast { p24: number | null; p48: number | null; at: string | null; method: string; methodUrl: string; sample?: number }
+export interface Forecast {
+  p24: number | null; p48: number | null; at: string | null; method: string; methodUrl: string; sample?: number;
+  generatedAt?: string | null; basisAt?: string | null; basisPrecision?: 'minute' | 'day' | 'estimated' | 'unknown';
+  sampleKind?: 'events' | 'backtest'; explanation?: string;
+}
 export interface Payload { events: Event[]; forecast: Forecast | null; updated: string | null; coverage: string; historyAvailable: boolean }
 export interface Source { id: string; name: string; home: string; endpoints: { part: string; url: string }[] }
 export const SOURCES: Source[] = [
@@ -68,6 +72,18 @@ export function normalize(id: string, parts: Record<string, unknown>): Payload {
     rawEvents = [app.lastConfirmedReset, ...eventsIn({ events: app.recentEvents })].filter(Boolean);
     updated = firstDate(app.dataAsOf, app.generatedAt);
   }
+  if (forecast) {
+    const raw = id==='app' ? obj(app.forecast) : id==='dev' && Object.keys(obj(f0.forecast)).length ? obj(f0.forecast) : f0;
+    forecast.generatedAt = firstDate(raw.generated_at, raw.generatedAt, app.generatedAt);
+    forecast.basisAt = firstDate(raw.last_reset_at, raw.lastResetAt, raw.last_global_reset_at, obj(app.lastConfirmedReset).timestamp);
+    forecast.basisPrecision = forecast.basisAt ? /^\d{4}-\d{2}-\d{2}$/.test(forecast.basisAt) ? 'day' : 'minute' : 'unknown';
+    if (!forecast.basisAt && id==='ai' && typeof f0.hours_since_last==='number' && Number.isFinite(f0.hours_since_last) && f0.hours_since_last>=0 && forecast.generatedAt) {
+      forecast.basisAt = new Date(Date.parse(forecast.generatedAt)-f0.hours_since_last*3600000).toISOString();
+      forecast.basisPrecision = 'estimated';
+    }
+    forecast.sampleKind = id==='ai' ? 'backtest' : 'events';
+    forecast.explanation = id==='ai' ? '按历史公共重置间隔计算频率；等待更久不会自动提高概率。' : id==='app' ? '结合公开消息、服务状态与社区信号作启发式估算。' : forecast.method;
+  }
   const events = rawEvents.map(r => event(r, id)).filter((r): r is Event => !!r);
   const historyAvailable = id === 'dev' && (Array.isArray(parts.history) || ['events','history','records','items','resets','data'].some(k => Array.isArray(hist[k])));
   const recognized = historyAvailable || events.length > 0 || forecast !== null || ['latestGlobalReset','latestBankedReset','todayStatus','globalStatus','resetArchiveSyncedAt'].some(k => k in status);
@@ -105,4 +121,19 @@ export function monthOf(e: Event, zone: Zone): string {
   if (e.dayOnly) return e.at.slice(0,7);
   return new Intl.DateTimeFormat('sv-SE', { timeZone: zone, year:'numeric', month:'2-digit' }).format(new Date(e.at));
 }
-export function isStale(at: string | null, now = Date.now()) { return !at || now-Date.parse(at)>30*60*1000 || Date.parse(at)>now+5*60*1000; }
+export function isStale(at: string | null, now = Date.now()) { return !at || !Number.isFinite(Date.parse(at)) || now-Date.parse(at)>30*60*1000 || Date.parse(at)>now+5*60*1000; }
+export function dayOf(at: string, zone: Zone, dayOnly=false) {
+  return dayOnly ? at.slice(0,10) : new Intl.DateTimeFormat('sv-SE',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(at));
+}
+export type ForecastState = 'available' | 'different' | 'stale' | 'unpublished';
+export function assessForecast(f: Forecast | null, latest: Event | undefined, now=Date.now()): { state:ForecastState; basisKnown:boolean } {
+  const basisKnown=!!f?.basisAt && !!f.basisPrecision && !['unknown','day'].includes(f.basisPrecision) && !!latest && !latest.dayOnly && !latest.conflict;
+  if(!f || (f.p24===null && f.p48===null)) return {state:'unpublished',basisKnown};
+  if(isStale(f.at,now)) return {state:'stale',basisKnown};
+  if(basisKnown && Date.parse(latest!.at)-Date.parse(f!.basisAt!)>3600000) return {state:'different',basisKnown};
+  return {state:'available',basisKnown};
+}
+export function elapsed(at: string, now=Date.now()) {
+  const mins=Math.max(0,Math.floor((now-Date.parse(at))/60000));
+  return mins<1?'刚刚':mins<60?`${mins} 分钟前`:mins<1440?`${Math.floor(mins/60)} 小时 ${mins%60} 分钟前`:`${Math.floor(mins/1440)} 天 ${Math.floor(mins%1440/60)} 小时前`;
+}
