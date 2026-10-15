@@ -64,6 +64,7 @@ export function normalize(id: string, parts: Record<string, unknown>): Payload {
     updated = firstDate(status.resetArchiveSyncedAt, status.historyUpdatedAt, hist.updated_at, hist.synced_at, status.updated_at, status.lastChecked);
   } else if (id === 'ai') {
     const p = obj(f0.probabilities);
+    if (f0.available === false) forecast = {p24:null,p48:null,at:firstDate(f0.source_updated_at,f0.generated_at),method:text(f0.note)||'来源暂未发布估算',methodUrl:safeUrl(f0.method_url)};
     if (f0.available !== false && Object.keys(p).length) forecast = { p24: percent(p.raw_24h, true), p48: percent(p.raw_48h, true), at: firstDate(f0.source_updated_at, f0.generated_at), method: str(f0.model) || '历史间隔频率估算', methodUrl: safeUrl(f0.method_url), sample: typeof obj(f0.backtest).cases === 'number' ? f0.backtest.cases : undefined };
     updated = firstDate(f0.source_updated_at, f0.generated_at);
   } else {
@@ -136,4 +137,9 @@ export function assessForecast(f: Forecast | null, latest: Event | undefined, no
 export function elapsed(at: string, now=Date.now()) {
   const mins=Math.max(0,Math.floor((now-Date.parse(at))/60000));
   return mins<1?'刚刚':mins<60?`${mins} 分钟前`:mins<1440?`${Math.floor(mins/60)} 小时 ${mins%60} 分钟前`:`${Math.floor(mins/1440)} 天 ${Math.floor(mins%1440/60)} 小时前`;
+}
+
+export function rangedIntervalStats(events:Event[],range:'30'|'90'|'all',now=Date.now()) {
+  const start=range==='all'?-Infinity:now-Number(range)*86400000;
+  return intervalStats(events.filter(e=>Date.parse(e.at)>=start&&Date.parse(e.at)<=now));
 }

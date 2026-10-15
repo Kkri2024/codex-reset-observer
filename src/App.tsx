@@ -1,27 +1,29 @@
-import { useMemo,useState } from 'react';
+import { useMemo } from 'react';
 import { Activity,ArrowUpRight,ChevronDown,Clock3,RefreshCw,TriangleAlert } from 'lucide-react';
 import { assessForecast,dayOf,elapsed,formatTime,isStale,mergeEvents,type Event,type Zone } from './data';
 import { sourceState,type Reading } from './store';
 import { useReadings } from './useReadings';
 import { History } from './History';
 import { Stats } from './Stats';
+import {useFilters} from './historyState';
 const requestLabels:Record<string,string>={status:'最新状态',history:'历史记录',forecast:'预测',signal:'公开信号'};
 function Out({href,children}:{href:string;children:React.ReactNode}){return href?<a href={href} target="_blank" rel="noopener noreferrer">{children}<ArrowUpRight size={14} aria-hidden="true"/></a>:null;}
 export default function App(){
   const {readings,loading,now,cacheWarning,refresh,remaining}=useReadings();
-  const [zone,setZone]=useState<Zone>('Asia/Shanghai');
+  const [filters,setFilters]=useFilters(),zone=filters.tz;
   const events=useMemo(()=>mergeEvents(readings.flatMap(r=>r.payload?.events??[])),[readings]);
   const latest=events.find(e=>e.kind==='global'),banked=events.find(e=>e.kind==='banked');
   const main=readings[0],mainFresh=['status','history'].some(k=>main.requests[k]?.outcome==='success')&&!isStale(main.payload?.updated??null,now);
   const today=events.find(e=>e.kind==='global'&&!e.dayOnly&&!e.conflict&&dayOf(e.at,zone)===dayOf(new Date(now).toISOString(),zone));
   const todayCurrent=today&&readings.some(r=>today.origins.includes(r.source.id)&&['status','history','signal'].some(k=>r.requests[k]?.outcome==='success')&&!isStale(r.payload?.updated??null,now));
-  const headline=today?'今日已收录公共重置':mainFresh?'今日尚未收录公共重置':'今日状态未知';
+  const ambiguousToday=events.some(e=>e.kind==='global'&&(e.dayOnly||e.conflict)&&dayOf(e.at,zone,e.dayOnly)===dayOf(new Date(now).toISOString(),zone));
+  const headline=today?'今日已收录公共重置':mainFresh&&!ambiguousToday?'今日尚未收录公共重置':'今日状态未知';
   const forecastRows=readings.map(r=>{
     const f=r.payload?.forecast??null,assessment=assessForecast(f,latest,now),req=r.requests[r.source.id==='app'?'signal':'forecast'];
     return {r,f,assessment,req,prominent:!!f&&(f.p24!==null||f.p48!==null)&&!['stale','unpublished'].includes(assessment.state)&&req?.outcome!=='failed'};
   }).sort((a,b)=>Number(b.prominent)-Number(a.prominent));
   const lastFetch=Math.max(0,...readings.flatMap(r=>Object.values(r.parts).map(p=>Date.parse(p.fetchedAt))));
-  return <><a className="skip" href="#main">跳到主要内容</a><header className="site-header"><a className="brand" href="#main"><span className="brand-icon"><Activity size={20} aria-hidden="true"/></span>Codex 重置观察站</a><nav aria-label="主要导航"><a href="#forecast">重置估算</a><a href="#history">历史记录</a><a href="#sources">数据来源</a></nav><div className="header-controls"><label className="zone"><span className="sr-only">显示时区</span><select value={zone} onChange={e=>setZone(e.target.value as Zone)}><option value="Asia/Shanghai">北京时间 UTC+8</option><option value="UTC">协调世界时 UTC</option></select></label><button className="primary" disabled={loading||remaining>0} onClick={()=>void refresh()}><RefreshCw size={15} className={loading?'spin':''} aria-hidden="true"/>{loading?'刷新中…':remaining>0?`${remaining} 秒后可刷新`:'刷新数据'}</button></div></header><main id="main">
+  return <><a className="skip" href="#main">跳到主要内容</a><header className="site-header"><a className="brand" href="#main"><span className="brand-icon"><Activity size={20} aria-hidden="true"/></span>Codex 重置观察站</a><nav aria-label="主要导航"><a href="#forecast">重置估算</a><a href="#history">历史记录</a><a href="#sources">数据来源</a></nav><div className="header-controls"><label className="zone"><span className="sr-only">显示时区</span><select value={zone} onChange={e=>setFilters({tz:e.target.value as Zone})}><option value="Asia/Shanghai">北京时间 UTC+8</option><option value="UTC">协调世界时 UTC</option></select></label><button className="primary" disabled={loading||remaining>0} onClick={()=>void refresh()}><RefreshCw size={15} className={loading?'spin':''} aria-hidden="true"/>{loading?'刷新中…':remaining>0?`${remaining} 秒后可刷新`:'刷新数据'}</button></div></header><main id="main">
     <section className="today-panel" aria-labelledby="today-title"><div className="today-heading"><span className="eyebrow">公共重置记录</span><span className="meta">独立观察 · 非官方</span></div><h1 id="today-title">{headline}</h1><div className="today-meta"><span className="tag neutral">第三方收录</span>{today&&!todayCurrent&&<span className="warning">本机缓存／尚未更新</span>}{!today&&!mainFresh&&<span className="meta">等待主来源的新数据</span>}</div>{latest?<div className="latest-record"><div><span className="meta">最近公共重置{latest.conflict?' · 来源有差异':''}</span><p className="event-time">{formatTime(latest.at,zone,latest.dayOnly)}<span>{latest.dayOnly?'时间精度不足':elapsed(latest.at,now)}</span></p><p className="scope">{latest.scope}</p></div><Out href={latest.url}>原始公告</Out></div>:<p className="empty compact">{loading?'正在读取公开记录…':'暂无可用记录，请稍后刷新或查看数据来源。'}</p>}<p className="footnote">公告时间不代表每个账户的恢复时间，个人额度以 Codex 显示为准。</p></section>
     <div className="banked-strip"><details><summary><span className="tag banked">赠送次数</span><span>{banked?formatTime(banked.at,zone,banked.dayOnly):'暂无可用记录'}</span><ChevronDown size={14} aria-hidden="true"/></summary>{banked&&<div className="banked-detail"><p>{banked.title} · {banked.scope}</p><p>赠送次数需要自行使用，与直接恢复额度不同。</p><Out href={banked.url}>原始公告</Out></div>}</details></div>
     {cacheWarning&&<p className="notice">浏览器未允许保存缓存，当前数据仍可查看。</p>}
@@ -30,8 +32,8 @@ export default function App(){
       const content=<><div className="probabilities"><div><span>未来 24 小时</span><strong>{f?.p24==null?'未提供':`${f.p24}%`}</strong></div><div><span>未来 48 小时</span><strong>{f?.p48==null?'未提供':`${f.p48}%`}</strong></div></div>{assessment.state==='different'&&<p className="notice"><TriangleAlert size={15} aria-hidden="true"/>预测基准与最新历史存在差异。来源口径不同，不代表任一来源已被判定错误。</p>}<div className="forecast-times"><p>上游更新：{formatTime(f?.at??null,zone)}</p><p>生成时间：{formatTime(f?.generatedAt??null,zone)}</p><p>重置基准：{f?.basisAt?`${formatTime(f.basisAt,zone,f.basisPrecision==='day')}${f.basisPrecision==='estimated'?'（估算）':''}`:'未提供'}{!assessment.basisKnown?' · 无法核对':''}</p></div><p>{f?.explanation||req?.error||'来源未提供可用估算，未提供不代表概率为零。'}</p>{f?.sample!=null&&<p>{f.sampleKind==='backtest'?'回测次数':'历史事件样本数'}：{f.sample}</p>}<details className="method"><summary>原始方法与原因<ChevronDown size={14} aria-hidden="true"/></summary><p>{f?.method||'无方法说明'}</p>{req?.error&&<p>{req.error}。可稍后重试或打开来源网站。</p>}<Out href={f?.methodUrl||r.source.home}>来源说明</Out></details></>;
       return prominent?<article className="forecast-row" key={r.source.id}><div className="forecast-name"><Out href={r.source.home}>{r.source.name}</Out><span className={state==='可用'?'state good':'state warning'}>{state}</span></div><div className="probabilities"><div><span>24 小时</span><strong>{f?.p24==null?'未提供':`${f.p24}%`}</strong></div><div><span>48 小时</span><strong>{f?.p48==null?'未提供':`${f.p48}%`}</strong></div></div><div className="forecast-brief"><span><Clock3 size={13} aria-hidden="true"/>更新 {formatTime(f?.at??null,zone)}</span>{assessment.state==='different'?<span className="warning">预测基准与最新历史存在差异</span>:!assessment.basisKnown?<span>基准无法核对</span>:null}</div><details className="forecast-details"><summary>计算说明与依据<ChevronDown size={14} aria-hidden="true"/></summary>{content}</details></article>:<details className="forecast-unavailable" key={r.source.id}><summary><span>{r.source.name}</span><span className="state warning">{state}</span><ChevronDown size={14} aria-hidden="true"/></summary><div className="forecast-expanded">{content}</div></details>;
     })}</div><p className="footnote">实验性估算，不是官方预告。更新时间新，不代表预测基准已纳入最新事件。</p></section>
-    <History events={events} zone={zone} available={main.requests.history?.outcome==='success'}/>
-    <Stats events={events} zone={zone}/>
+    <History events={events} filters={filters} onChange={setFilters} available={main.requests.history?.outcome==='success'}/>
+    <Stats events={events} zone={zone} range={filters.range} onRange={range=>setFilters({range})} now={now}/>
     <section id="sources" aria-labelledby="sources-title"><div className="section-head"><h2 id="sources-title">数据来源</h2><span className="meta" role="status">{loading?'正在请求…':lastFetch?`最近读取 ${formatTime(new Date(lastFetch).toISOString(),zone)}`:'尚未成功读取'}</span></div><p className="section-description">只读取公开资料。来源可能共用上游，不等于多次独立核验。</p>{readings.map(r=><SourceRow key={r.source.id} r={r} zone={zone}/>)}<p className="footnote">本机读取、上游更新和预测基准是不同时间；页面可见时每 5 分钟刷新。关闭页面后不采集。</p></section>
     <footer><span><Activity size={16} aria-hidden="true"/>Codex 重置观察站</span><p>独立第三方工具，与 OpenAI 无隶属关系。</p><a href="#main">回到顶部 ↑</a></footer>
   </main></>;

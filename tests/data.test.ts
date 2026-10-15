@@ -18,7 +18,7 @@ describe('source adapters',()=>{
     const f=normalize('ai',{forecast:{available:true,probabilities:{raw_24h:0,raw_48h:0.32},source_updated_at:'2026-01-01T00:00:00Z'}}).forecast!;
     expect(f.p24).toBe(0);expect(f.p48).toBe(32);
   });
-  it('supports an explicitly unavailable ai prediction without inventing data',()=>expect(()=>normalize('ai',{forecast:{available:false}})).toThrow());
+  it('supports an explicitly unpublished ai prediction without marking the request failed',()=>expect(normalize('ai',{forecast:{available:false}}).forecast?.p24).toBeNull());
   it('uses app dataAsOf instead of generatedAt for freshness',()=>{
     const p=normalize('app',{signal:{generatedAt:'2026-02-01T00:00:00Z',dataAsOf:'2026-01-01T00:00:00Z',forecast:{probability24h:77,probability48h:92},lastConfirmedReset:raw({kind:'confirmed',type:undefined,timestamp:'2026-01-01T00:00:00Z'}),recentEvents:[raw({type:undefined,kind:'signal'})]}});
     expect(p.forecast?.p24).toBe(77);expect(p.updated).toBe('2026-01-01T00:00:00Z');expect(p.events[1].kind).toBe('signal');
