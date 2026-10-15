@@ -10,3 +10,5 @@
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{animation:none!important;transition:none!important}}
 
 .event-update{font-size:10px;color:var(--muted);margin-top:8px}
+
+@media(max-width:560px){.mobile-break{display:block}.site-header nav a{padding:10px 0}.intro h1{line-height:1.5}}

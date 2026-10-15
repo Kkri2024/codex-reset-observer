@@ -33,7 +33,7 @@ function event(raw: unknown, source: string): Event | null {
   const r = obj(raw), evidence = obj(r.source), at = firstDate(r.timestamp, r.date, r.announced_at, r.announcedAt, r.effective_at, r.occurred_at, r.at);
   if (!at || Date.parse(at) > Date.now()) return null;
   const type = str(r.type || r.event_type || r.kind), status = str(r.status || r.verification_status || r.kind);
-  let kind: Kind = /banked|credit|grant/.test(type) ? 'banked' : /global|confirmed|quota_reset|^reset$/.test(type) ? 'global' : 'signal';
+  let kind: Kind = ['banked','banked_reset','banked_reset_grant','reset_credit','reset_credits','credit','grant'].includes(type) ? 'banked' : ['global','global_reset','confirmed','quota_reset','reset','regular'].includes(type) ? 'global' : 'signal';
   if (/planned|preview|signal|pending|unverified/.test(status)) kind = 'signal';
   const url = safeUrl(r.source_url || r.sourceUrl || r.evidence_url || r.original_url || evidence.url || r.url);
   return { id: str(r.id) || `${source}:${at}:${type}`, at, dayOnly: r.time_precision === 'day' || /^\d{4}-\d{2}-\d{2}$/.test(at),
