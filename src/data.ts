@@ -1,3 +1,4 @@
+import { normalizeAudit, normalizeFeed, normalizeTimeline, PUBLIC_HOME, PUBLIC_ID } from './publicEvidence';
 export type Kind = 'global' | 'banked' | 'signal';
 export type Zone = 'Asia/Shanghai' | 'UTC';
 export interface Event {
@@ -20,6 +21,11 @@ export const SOURCES: Source[] = [
   ] },
   { id: 'ai', name: 'Codex Reset · ai', home: 'https://codexreset.ai', endpoints: [{ part: 'forecast', url: 'https://codexreset.ai/api/v1/forecast.json' }] },
   { id: 'app', name: 'Codex Reset · app', home: 'https://codexreset.app', endpoints: [{ part: 'signal', url: 'https://codexreset.app/api/signal' }] },
+  { id: PUBLIC_ID, name: PUBLIC_ID, home: PUBLIC_HOME, endpoints: [
+    { part:'feed', url:`${PUBLIC_HOME}api/feed?locale=zh` },
+    { part:'timeline', url:`${PUBLIC_HOME}api/timeline` },
+    { part:'audit', url:`${PUBLIC_HOME}api/forecast` },
+  ] },
 ];
 type Obj = Record<string, any>;
 const obj = (x: unknown): Obj => x && typeof x === 'object' && !Array.isArray(x) ? x as Obj : {};
@@ -48,6 +54,14 @@ function event(raw: unknown, source: string): Event | null {
 function unwrap(raw: unknown): Obj { const r = obj(raw); return r.data && !Array.isArray(r.data) ? obj(r.data) : r; }
 function eventsIn(raw: unknown): unknown[] { if (Array.isArray(raw)) return raw; const r = unwrap(raw); for (const k of ['events','history','records','items','resets','data']) if (Array.isArray(r[k])) return r[k]; return []; }
 export function normalize(id: string, parts: Record<string, unknown>): Payload {
+  if (id === PUBLIC_ID) {
+    const feed = parts.feed ? normalizeFeed(parts.feed) : null;
+    const timeline = parts.timeline ? normalizeTimeline(parts.timeline) : null;
+    const audit = parts.audit ? normalizeAudit(parts.audit) : null;
+    if (!feed && !timeline && !audit) throw new Error('尚未读取公共数据');
+    return {events:[],forecast:null,updated:feed?.updated??timeline?.updated??audit?.updated??null,
+      historyAvailable:false,coverage:'第三方动态与时间线；本站未独立核验原帖。'};
+  }
   const status = unwrap(parts.status), hist = unwrap(parts.history), f0 = unwrap(parts.forecast), app = unwrap(parts.signal);
   let forecast: Forecast | null = null;
   let rawEvents: unknown[] = [];
@@ -79,8 +93,8 @@ export function normalize(id: string, parts: Record<string, unknown>): Payload {
     forecast.basisAt = firstDate(raw.last_reset_at, raw.lastResetAt, raw.last_global_reset_at, obj(app.lastConfirmedReset).timestamp);
     forecast.basisPrecision = forecast.basisAt ? /^\d{4}-\d{2}-\d{2}$/.test(forecast.basisAt) ? 'day' : 'minute' : 'unknown';
     if (!forecast.basisAt && id==='ai' && typeof f0.hours_since_last==='number' && Number.isFinite(f0.hours_since_last) && f0.hours_since_last>=0 && forecast.generatedAt) {
-      forecast.basisAt = new Date(Date.parse(forecast.generatedAt)-f0.hours_since_last*3600000).toISOString();
-      forecast.basisPrecision = 'estimated';
+      const basis = new Date(Date.parse(forecast.generatedAt)-f0.hours_since_last*3600000);
+      if (Number.isFinite(basis.getTime())) { forecast.basisAt = basis.toISOString(); forecast.basisPrecision = 'estimated'; }
     }
     forecast.sampleKind = id==='ai' ? 'backtest' : 'events';
     forecast.explanation = id==='ai' ? '按历史公共重置间隔计算频率；等待更久不会自动提高概率。' : id==='app' ? '结合公开消息、服务状态与社区信号作启发式估算。' : forecast.method;

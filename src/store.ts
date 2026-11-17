@@ -1,3 +1,4 @@
+import { PUBLIC_ID } from './publicEvidence';
 import { normalize, SOURCES, type Payload, type Source } from './data';
 export const CACHE_KEY = 'codex-reset-observer:v2';
 export const LEGACY_KEY = 'codex-reset-observer:v1';
@@ -45,7 +46,13 @@ export async function refreshReading(previous:Reading,fetcher:typeof fetch=fetch
   await Promise.all(previous.source.endpoints.map(async ep=>{
     const attemptedAt=new Date().toISOString();
     try{
-      const raw=await fetchJson(ep.url,fetcher);normalize(previous.source.id,{[ep.part]:raw});
+      const raw=await fetchJson(ep.url,fetcher);
+      const incoming=normalize(previous.source.id,{[ep.part]:raw});
+      if(previous.source.id===PUBLIC_ID){
+        const old=parts[ep.part]&&parse(previous.source,{[ep.part]:parts[ep.part]});
+        if(!incoming.updated||Date.parse(incoming.updated)>Date.now()+300000) throw new Error('来源更新时间异常');
+        if(old?.updated&&Date.parse(incoming.updated)<Date.parse(old.updated)) throw new Error('来源更新时间倒退，已保留上次记录');
+      }
       parts[ep.part]={raw,fetchedAt:new Date().toISOString()};requests[ep.part]={outcome:'success',attemptedAt,lastOutcome:'success'};
     }catch(e){const error=e instanceof Error?e.message:'读取失败';errors[ep.part]=error;requests[ep.part]={outcome:'failed',lastOutcome:'failed',attemptedAt,error};}
   }));

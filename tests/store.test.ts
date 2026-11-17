@@ -4,9 +4,9 @@ const storage=()=>{const m=new Map<string,string>();return {getItem:(k:string)=>
 const good={available:true,probabilities:{raw_24h:0.2,raw_48h:null},source_updated_at:'2026-01-01T00:00:00Z'};
 const response=(v:unknown)=>Promise.resolve(new Response(JSON.stringify(v),{status:200}));
 describe('cache and network resilience',()=>{
-  it('loads without local storage',()=>expect(readCache()).toHaveLength(3));
+  it('loads without local storage',()=>expect(readCache()).toHaveLength(4));
   it('ignores corrupt cache',()=>{const s=storage();s.setItem(CACHE_KEY,'bad');expect(readCache(s).every(r=>!r.payload)).toBe(true);});
-  it('tolerates blocked local storage',()=>{const s={getItem:()=>{throw Error();},setItem:()=>{throw Error();}};expect(readCache(s)).toHaveLength(3);expect(writeCache(readCache(),s)).toBe(false);});
+  it('tolerates blocked local storage',()=>{const s={getItem:()=>{throw Error();},setItem:()=>{throw Error();}};expect(readCache(s)).toHaveLength(4);expect(writeCache(readCache(),s)).toBe(false);});
   it('caches successful data and restores it across reload',async()=>{
     const s=storage(), r=await refreshReading(readCache()[1],vi.fn(()=>response(good)));writeCache([r],s);const restored=readCache(s)[1];expect(restored.cached).toBe(true);expect(restored.payload?.forecast?.p24).toBe(20);
   });

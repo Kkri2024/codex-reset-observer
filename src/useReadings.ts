@@ -5,7 +5,7 @@ export function useReadings(){
   const [readings,setReadings]=useState(()=>readCache(storage)),ref=useRef(readings),busy=useRef(false),attempted=useRef(lastAttempt(storage));
   const [loading,setLoading]=useState(false),[now,setNow]=useState(Date.now()),[cacheWarning,setCacheWarning]=useState(false);
   const refresh=useCallback(async()=>{
-    if(busy.current||cooldownDelay(attempted.current)>0)return;
+    if(document.visibilityState!=='visible'||busy.current||cooldownDelay(attempted.current)>0)return;
     busy.current=true;attempted.current=Date.now();setNow(Date.now());setLoading(true);
     try{
       try{storage?.setItem(ATTEMPT_KEY,String(attempted.current));}catch{setCacheWarning(true);}
@@ -19,15 +19,17 @@ export function useReadings(){
     let wake:ReturnType<typeof setTimeout>|undefined;
     const request=()=>{
       if(document.visibilityState!=='visible')return;
-      const delay=cooldownDelay(attempted.current);
+      const delay=Math.max(busy.current?1000:0,cooldownDelay(attempted.current));
       if(delay>0){clearTimeout(wake);wake=setTimeout(request,delay+20);}else void refresh();
     };
     request();
     const tick=setInterval(()=>{if(document.visibilityState==='visible')setNow(Date.now());},1000);
     const poll=setInterval(request,300000);
-    const visible=()=>{if(Date.now()-attempted.current>=300000||ref.current.some(r=>Object.values(r.requests).some(s=>s.outcome==='waiting')))request();};
+    const visible=()=>{ if(document.visibilityState==='visible'){setNow(Date.now());request();} };
+    const restored=(event:PageTransitionEvent)=>{if(event.persisted)visible();};
+    window.addEventListener('pageshow',restored);
     document.addEventListener('visibilitychange',visible);
-    return()=>{clearTimeout(wake);clearInterval(tick);clearInterval(poll);document.removeEventListener('visibilitychange',visible);};
+    return()=>{clearTimeout(wake);clearInterval(tick);clearInterval(poll);document.removeEventListener('visibilitychange',visible);window.removeEventListener('pageshow',restored);};
   },[refresh]);
   return {readings,loading,now,cacheWarning,refresh,remaining:Math.ceil(cooldownDelay(attempted.current,now)/1000)};
 }
