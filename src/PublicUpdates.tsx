@@ -7,14 +7,14 @@ import type { Reading } from './store';
 function Link({href,children}:{href:string;children:React.ReactNode}) {
   return <a href={href} target="_blank" rel="noopener noreferrer">{children} <ArrowUpRight size={14} aria-hidden="true"/></a>;
 }
-function Credit() { return <p className="footnote">数据来源：<Link href={PUBLIC_HOME}>codex-reset.com</Link> · 第三方收录，本站未独立核验 X 原帖。</p>; }
+function Credit() { return <p className="footnote">数据：<Link href={PUBLIC_HOME}>codex-reset.com</Link></p>; }
 function readPart<T>(raw:unknown, parse:(raw:unknown)=>T):T|null { try { return parse(raw); } catch { return null; } }
 function PartState({reading,part,updated,stale,zone}:{reading:Reading;part:string;updated:string|null;stale:boolean;zone:Zone}) {
   const request=reading.requests[part], fetched=reading.parts[part]?.fetchedAt;
   const state=request?.outcome==='failed'?(fetched?'读取失败 · 本机缓存':'读取失败'):
     request?.outcome==='success'?(stale?'已连接 · 来源数据过期或时间异常':'本次读取成功'):
     fetched?'本机缓存 · 等待更新':'等待更新';
-  return <p className="meta public-source-state">{state}{request?.error&&` · ${request.error}`} · 上游更新：{formatTime(updated,zone)} · 本机最近成功：{formatTime(fetched??null,zone)}</p>;
+  return <p className="meta public-source-state">{request?.outcome==='success'&&!stale?`更新：${formatTime(updated,zone)}`:`${state} · 上游更新：${formatTime(updated,zone)}`}</p>;
 }
 function recordName(record:PublicRecord) {
   if(record.status==='observed') return record.kind==='banked'?'第三方观察到赠送次数':'第三方观察到公共重置';
@@ -52,12 +52,11 @@ export function PublicUpdates({reading,legacy,zone,now}:{reading:Reading;legacy:
         const conflict=old&&(old.conflict||old.kind!==e.kind||Math.abs(Date.parse(old.at)-Date.parse(e.at))>60000);
         return <li key={`${e.id}:${i}`}>
           <div className="public-row-head">{i>0&&<strong>{recordName(e)}</strong>}<time dateTime={e.at}>{formatTime(e.at,zone)}</time></div>
-          <p>{e.status==='observed'?'仅为来源或其监测账户的观察，其他账户到账情况未知。':e.status==='announced'?'公告已收录，实际生效范围与到账状态待核实。':'记录类型或生效情况尚未确认。'}{e.effective&&` 来源另列生效时间：${formatTime(e.effective,zone)}。`}</p>
+          <p>{e.status==='observed'?'仅为来源或其监测账户的观察，其他账户到账情况未知。':e.status==='announced'?'公告已收录，实际生效范围与到账状态待核实。':'记录类型或生效情况尚未确认。'}{e.effective&&` 来源另列生效时间：${formatTime(e.effective,zone)}。`}{e.kind==='banked'&&' 赠送次数通常需自行使用。'}</p>
           {conflict&&<p className="warning">旧历史来源对同一原帖的类型或时间记录有差异。</p>}
           {e.url&&<Link href={e.url}>查看原帖</Link>}
         </li>;
       })}</ul>:fallback?<div className="latest-record"><div><strong>其他来源历史参考：{fallback.kind==='banked'?'赠送次数':'公共重置'}</strong><p>{formatTime(fallback.at,zone,fallback.dayOnly)} · {fallback.origins.join('、')} · 仅作历史参考，当前生效状态未知</p></div>{fallback.url&&<Link href={fallback.url}>查看来源记录</Link>}</div>:<p className="empty compact">可查看下方历史和来源状态；未收录不代表未发生。</p>}
-      <p className="footnote">赠送次数通常需自行使用。公告、观察和账户实际生效是不同的状态。</p>
       <Credit/>
     </section>
     <section id="tibo" aria-labelledby="tibo-title">
@@ -68,13 +67,10 @@ export function PublicUpdates({reading,legacy,zone,now}:{reading:Reading;legacy:
       {feed&&feed.scope!=='timeline'&&<p className="notice">当前来源只提供部分动态，可能缺少帖子或回复。</p>}
       {feed?.posts.length?<ul className="public-list">{feed.posts.slice(0,showAll?12:3).map(post=><li key={post.id}>
         <div className="public-row-head"><strong>{post.reply?'回复':'帖子'} · {post.relevant?'重置相关':'相关性待确认'}</strong><time dateTime={post.at}>{formatTime(post.at,zone)}</time></div>
-        {post.translation&&<p className="post-quote"><span className="meta">来源译文（术语可能有误）</span><br/>{post.translation}</p>}
-        <p className="post-quote" lang="en">{post.text}</p>
-        {!post.translation&&<p className="meta">暂无可用译文，可尝试 Safari 菜单中的网页翻译。</p>}
+        {post.translation?<p className="post-quote"><span className="meta">译文</span><br/>{post.translation}</p>:<p className="post-quote" lang="en">{post.text}</p>}
         <div className="post-links"><Link href={post.url}>查看 X 原帖</Link>{post.parent&&<Link href={`https://x.com/i/web/status/${post.parent}`}>查看被回复的帖子</Link>}</div>
       </li>)}</ul>:<p className="empty compact">暂无可显示的相关动态。</p>}
       {feed&&feed.posts.length>3&&<button className="secondary feed-toggle" onClick={()=>setShowAll(v=>!v)}>{showAll?'收起动态':`查看全部 ${Math.min(feed.posts.length,12)} 条动态`}</button>}
-      <p className="footnote">显示最近最多 12 条收录动态，可能遗漏帖子和回复。页面打开且可见时检查，返回页面后补查。</p>
       <Credit/>
     </section>
   </>;
@@ -91,9 +87,10 @@ export function ForecastEvidence({reading,legacy,zone,now}:{reading:Reading;lega
     <div className="section-head"><h2 id="forecast-title">重置估算</h2><span className="meta">实验性参考</span></div>
     <p className="notice"><strong>目前不可可靠估算未来 24 或 48 小时的公共重置概率。</strong></p>
     <PartState reading={reading} part="audit" updated={audit?.updated??null} stale={!audit||publicStale(audit.updated,now)} zone={zone}/>
+    <Credit/>
+    <details className="evidence-details"><summary>查看依据</summary>
     {audit&&<p className="section-description">来源报告 {audit.sample} 个滚动回测样本；Brier 分数（越低越好）：模型 {audit.model}、朴素基线 {audit.naive}、历史发生率基线 {audit.rate}。{audit.model>=Math.min(audit.naive,audit.rate)?'模型未超过两条基线。':'来源分数未经过本站独立复现。'} 重置基准：{formatTime(audit.basis,zone)}。</p>}
     <p className="footnote">本站未独立复现回测或验证历史覆盖。旧来源的更新时间、历史样本和方法仍可查看。</p>
-    <Credit/>
     {legacy.map(r=><details className="forecast-unavailable" key={r.source.id}>
       <summary>{r.source.name} · 旧估算依据</summary>
       <div className="forecast-expanded">
@@ -103,5 +100,6 @@ export function ForecastEvidence({reading,legacy,zone,now}:{reading:Reading;lega
         <Link href={r.payload?.forecast?.methodUrl||r.source.home}>来源说明</Link>
       </div>
     </details>)}
+    </details>
   </section>;
 }

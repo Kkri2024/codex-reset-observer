@@ -73,3 +73,12 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,su
 .history-calendar-layout .history-row{grid-template-columns:1fr;gap:6px;padding:14px 0}
 .history-calendar-layout .history-link{text-align:left}
 @media(max-width:768px){.history-calendar-layout{grid-template-columns:1fr;gap:4px}.history-calendar-layout .history-results{margin-top:8px}}
+
+/* 持续可见的导航，保留页面锚点的阅读空间 */
+.site-header{position:sticky;top:0;z-index:20;background:#f3f1e9;box-shadow:0 4px 10px #2934320d}
+section,main{scroll-margin-top:110px}
+.reading-notes,.evidence-details{margin-top:12px;border-top:1px dashed var(--line)}
+.reading-notes>summary,.evidence-details>summary{color:var(--blue);font-weight:600;cursor:pointer}
+.reading-notes p{line-height:1.7}
+@media(max-width:1000px){section,main{scroll-margin-top:160px}}
+@media(max-width:600px){.site-header{padding-block:8px;gap:3px 10px}.site-header nav a{min-height:36px}.site-header nav{padding-top:0}.header-controls .primary{min-height:38px}section,main{scroll-margin-top:180px}}
