@@ -54,3 +54,22 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,su
 .source-row{border-bottom:1px dashed #c6cabe}.source-row>summary{color:#344d49;font-weight:600}.source-expanded{padding-left:12px;border-left:2px solid #d2ded1}.endpoint{border-color:#dedfd5}footer{border-color:#c6cabe}
 @media(max-width:1239px){main{margin:28px 32px 0}.site-header{padding:18px 32px}}
 @media(max-width:600px){.site-header{padding:14px 16px;gap:8px 12px}.site-header nav{border-color:#d5d5c9}.site-header nav a{min-height:44px}.header-controls{min-width:100%}main{margin:18px 16px 0}main>section:not(.today-panel){margin-top:38px}.today-panel{padding:20px 18px;box-shadow:3px 4px 0 #dce2d7}.today-panel h1{font-size:23px;line-height:1.35;margin:12px 0 8px}.today-heading{align-items:flex-start}.section-head{margin-bottom:14px}h2{font-size:20px}.public-list>li,.public-panel .public-list>li{padding:14px}.public-row-head{align-items:flex-start}.public-row-head time{width:100%}.history-toolbar{padding:12px}.history-row{padding:17px 2px}.history-date{gap:8px;flex-wrap:wrap}.history-actions{flex-wrap:wrap}.stats-summary{gap:12px 20px}.source-row>summary .state{overflow-wrap:anywhere}}
+
+/* 信息分层：最新记录、日历与按需展开的详情 */
+.public-panel .status-list{gap:0;margin-top:8px}
+.public-panel .status-list>li{background:transparent;border:0;border-radius:0;box-shadow:none;padding:12px 0;border-bottom:1px dashed #c7cabe}
+.public-panel .status-list>li:first-child{padding-top:4px}
+.public-panel .status-list>li:first-child time{font-size:19px;font-weight:700;color:var(--blue)}
+.public-panel .status-list p{margin:5px 0}
+.public-panel .status-list a{min-height:36px}
+.feed-toggle{margin-top:16px}
+.stats-disclosure{margin-top:36px;border-block:1px dashed #c7cabe}
+.stats-disclosure>summary{font-size:17px;font-weight:700;color:var(--ink);min-height:58px;justify-content:space-between}
+.stats-disclosure #intervals{padding:12px 0 24px}
+.history-calendar-layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(280px,1fr);gap:24px;align-items:start}
+.history-calendar-layout .calendar{max-width:none;margin-top:15px}
+.history-calendar-layout .history-results{margin-top:15px;min-width:0}
+.results-heading{font-size:15px;font-weight:700;margin:0 0 8px}
+.history-calendar-layout .history-row{grid-template-columns:1fr;gap:6px;padding:14px 0}
+.history-calendar-layout .history-link{text-align:left}
+@media(max-width:768px){.history-calendar-layout{grid-template-columns:1fr;gap:4px}.history-calendar-layout .history-results{margin-top:8px}}

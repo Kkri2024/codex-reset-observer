@@ -28,7 +28,7 @@ export function PublicUpdates({reading,legacy,zone,now}:{reading:Reading;legacy:
   const timelineStale=!timeline||publicStale(timeline.updated,now);
   const feedStale=!feed||feed.stale||publicStale(feed.updated,now);
   const feedCurrent=!feedStale&&reading.requests.feed?.outcome==='success';
-  const openedAt=useRef(Date.now()), cursor=useRef<AlertCursor|null>(null), [unread,setUnread]=useState(0);
+  const openedAt=useRef(Date.now()), cursor=useRef<AlertCursor|null>(null), [unread,setUnread]=useState(0), [showAll,setShowAll]=useState(false);
   useEffect(()=>{
     if (!feed || !feedCurrent || feed.inconsistent || document.visibilityState!=='visible') return;
     const next=advanceAlerts(cursor.current,feed.posts,openedAt.current);
@@ -47,11 +47,11 @@ export function PublicUpdates({reading,legacy,zone,now}:{reading:Reading;legacy:
       <div className="today-heading"><span className="eyebrow">公共重置状态</span><span className="meta">独立观察 · 非官方</span></div>
       <h1 id="today-title">{latest?`最新收录：${recordName(latest)}`:'暂无可核对的公共重置信息'}</h1>
       <PartState reading={reading} part="timeline" updated={timeline?.updated??null} stale={timelineStale} zone={zone}/>
-      {cards.length?<ul className="public-list">{cards.map((e,i)=>{
+      {cards.length?<ul className="public-list status-list">{cards.map((e,i)=>{
         const old=legacy.find(l=>e.url&&normalizePostLink(l.url)===e.url);
         const conflict=old&&(old.conflict||old.kind!==e.kind||Math.abs(Date.parse(old.at)-Date.parse(e.at))>60000);
         return <li key={`${e.id}:${i}`}>
-          <div className="public-row-head"><strong>{recordName(e)}</strong><time dateTime={e.at}>{formatTime(e.at,zone)}</time></div>
+          <div className="public-row-head">{i>0&&<strong>{recordName(e)}</strong>}<time dateTime={e.at}>{formatTime(e.at,zone)}</time></div>
           <p>{e.status==='observed'?'仅为来源或其监测账户的观察，其他账户到账情况未知。':e.status==='announced'?'公告已收录，实际生效范围与到账状态待核实。':'记录类型或生效情况尚未确认。'}{e.effective&&` 来源另列生效时间：${formatTime(e.effective,zone)}。`}</p>
           {conflict&&<p className="warning">旧历史来源对同一原帖的类型或时间记录有差异。</p>}
           {e.url&&<Link href={e.url}>查看原帖</Link>}
@@ -66,13 +66,14 @@ export function PublicUpdates({reading,legacy,zone,now}:{reading:Reading;legacy:
       <div role="status" className={unread?'new-post-notice':''}>{unread>0&&<><strong>发现 {unread} 条新的重置相关动态</strong> <button className="secondary" onClick={()=>setUnread(0)}>标为已读</button></>}</div>
       {feed?.inconsistent ? <p className="notice">同一帖子存在内容或时间冲突，已隐藏冲突记录并暂停本次提醒。</p>:null}
       {feed&&feed.scope!=='timeline'&&<p className="notice">当前来源只提供部分动态，可能缺少帖子或回复。</p>}
-      {feed?.posts.length?<ul className="public-list">{feed.posts.slice(0,12).map(post=><li key={post.id}>
+      {feed?.posts.length?<ul className="public-list">{feed.posts.slice(0,showAll?12:3).map(post=><li key={post.id}>
         <div className="public-row-head"><strong>{post.reply?'回复':'帖子'} · {post.relevant?'重置相关':'相关性待确认'}</strong><time dateTime={post.at}>{formatTime(post.at,zone)}</time></div>
         {post.translation&&<p className="post-quote"><span className="meta">来源译文（术语可能有误）</span><br/>{post.translation}</p>}
         <p className="post-quote" lang="en">{post.text}</p>
         {!post.translation&&<p className="meta">暂无可用译文，可尝试 Safari 菜单中的网页翻译。</p>}
         <div className="post-links"><Link href={post.url}>查看 X 原帖</Link>{post.parent&&<Link href={`https://x.com/i/web/status/${post.parent}`}>查看被回复的帖子</Link>}</div>
       </li>)}</ul>:<p className="empty compact">暂无可显示的相关动态。</p>}
+      {feed&&feed.posts.length>3&&<button className="secondary feed-toggle" onClick={()=>setShowAll(v=>!v)}>{showAll?'收起动态':`查看全部 ${Math.min(feed.posts.length,12)} 条动态`}</button>}
       <p className="footnote">显示最近最多 12 条收录动态，可能遗漏帖子和回复。页面打开且可见时检查，返回页面后补查。</p>
       <Credit/>
     </section>
